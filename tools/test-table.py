@@ -13,10 +13,11 @@
 
 # AESulator: the Acorn ARM Evaluation System, a Beebium plugin.
 # test-table.py, writes the table of tests
-# version 1.0.0, 17 November 2026.
+# version 2.0.0, 20 November 2026.
 
 # Writes scratch/plugin-tests.md (not committed), the table of the plugin's tests, from the tests themselves.
 # run-tests.sh runs it after a passing run, so nobody edits the table by hand.
+
 import glob, os, pathlib, re
 
 project = pathlib.Path(__file__).resolve().parent.parent
@@ -36,12 +37,14 @@ what = {
     "test_aes_tube.cpp": "The ARM's side of the Tube, driven as Beebium drives it",
     "test_aes_banner.cpp": "The banner through the Tube chip, tied to the ROM's SHA-1",
     "test_aes_rom_facts.cpp": "The ROM facts files, against the ROM",
+    "test_aes_debug.cpp": "The debugger's registers, memory, steps and resets, as Beebium's debugger sees them",
+    "test_aes_debug_stops.cpp": "The debugger's breakpoints and watchpoints",
     "test_aes_tube_log.cpp": "The counting wrapper, a test-build tool",
     "test_z_executive.cpp": "Exceptions through the real Executive, no Tube",
 }
 sections, total = [], 0
 for name, heading in what.items():
-    text = open(project / "aes-coprocessor/tests" / name, encoding="utf8").read()
+    text = open(project / "acorn-aes-coprocessor/tests" / name, encoding="utf8").read()
     tests = re.findall(r'^TEST\((\w+), "((?:[^"\\]|\\.)*)"\)', text, re.M)
     total += len(tests)
     rows = ["| Test | What it checks | Labels |", "|---|---|---|"]
@@ -51,10 +54,10 @@ for name, heading in what.items():
         rows.append(f"| `{test}` | {title.replace('|', '/')} | {labels} |")
     sections.append(f"## {heading} (`{name}`, {len(tests)})\n\n" + "\n".join(rows))
 found = sum(len(re.findall(r"^TEST\(", open(f, encoding="utf8").read(), re.M))
-            for f in glob.glob(str(project / "aes-coprocessor/tests/test_*.cpp")))
+            for f in glob.glob(str(project / "acorn-aes-coprocessor/tests/test_*.cpp")))
 if found != total:
     raise SystemExit(f"test-table: {found} tests in the files, {total} in the table: add the new file")
-head = (f"# Plugin tests\n\nThe tests in `aes-coprocessor/tests/`, {total} in all. Written by `tools/test-table.py` "
+head = (f"# Plugin tests\n\nThe tests in `acorn-aes-coprocessor/tests/`, {total} in all. Written by `tools/test-table.py` "
         "after each passing `run-tests.sh`: do not edit by hand. The real-AES test map is in "
         "the old repository (tag `6c233f0`).\n\n")
 (project / "scratch").mkdir(exist_ok=True)

@@ -13,13 +13,14 @@
 
 # AESulator: the Acorn ARM Evaluation System, a Beebium plugin.
 # fault-check.py, puts each known fault in a copy and checks the tests notice
-# version 1.0.0, 17 November 2026.
+# version 2.0.0, 20 November 2026.
 
 # Puts each known fault into a copy of the plugin code and checks that the tests notice.
 # Run from the project folder: python3 -u tools/fault-check.py | tee results/fault-check.log
 # Give fault numbers to run only those: python3 -u tools/fault-check.py 99 100
-# Works in a scratch folder, never on aes-coprocessor/. Takes about 20 minutes in full. Paths:
+# Works in a scratch folder, never on acorn-aes-coprocessor/. Takes about 20 minutes in full. Paths:
 # tools/paths.sh. The ROM must be there and the run is strict: a skipped test catches nothing.
+
 import glob, hashlib, importlib.util, os, pathlib, shutil, subprocess, sys, time
 
 project = pathlib.Path(__file__).resolve().parent.parent
@@ -41,28 +42,31 @@ spec.loader.exec_module(faults)
 # The VM's own disk: the compiler can misread a freshly edited file on the shared folder.
 shutil.rmtree(work, ignore_errors=True)
 (work / "tests").mkdir(parents=True)
-# plugin_entry.cpp needs Beebium's extension API, which only Beebium's build links (SRC, aes-coprocessor/CMakeLists.txt).
-for f in glob.glob(str(project / "aes-coprocessor/*.[ch]pp")):
+# plugin_entry.cpp needs Beebium's extension API, which only Beebium's build links (SRC, acorn-aes-coprocessor/CMakeLists.txt).
+for f in glob.glob(str(project / "acorn-aes-coprocessor/*.[ch]pp")):
     if not f.endswith("plugin_entry.cpp"):
         shutil.copy(f, work)
-for f in glob.glob(str(project / "aes-coprocessor/tests/*.[ch]pp")):
+for f in glob.glob(str(project / "acorn-aes-coprocessor/tests/*.[ch]pp")):
     shutil.copy(f, work / "tests")
-shutil.copytree(project / "aes-coprocessor/tests/rom-facts", work / "tests/rom-facts")
+shutil.copytree(project / "acorn-aes-coprocessor/tests/rom-facts", work / "tests/rom-facts")
 (work / "beebium").mkdir()
-for f in glob.glob(str(project / "aes-coprocessor/beebium/AesTube.*")) + [str(project / "aes-coprocessor/beebium/TubeLog.hpp")]:
+for f in (glob.glob(str(project / "acorn-aes-coprocessor/beebium/AesTube.*")) + glob.glob(str(project / "acorn-aes-coprocessor/beebium/AesDebug.*"))
+          + [str(project / "acorn-aes-coprocessor/beebium/TubeLog.hpp")]):
     shutil.copy(f, work / "beebium")
-shutil.copy(project / "aes-coprocessor/manifest.json", work)
+shutil.copy(project / "acorn-aes-coprocessor/manifest.json", work)
 os.environ["AES_PLUGIN_DIR"] = str(work)
 os.chdir(work)
 
-sources = {f: open(f).read() for f in glob.glob("*.cpp") + ["beebium/AesTube.cpp"]}
+sources = {f: open(f).read() for f in glob.glob("*.cpp") + ["beebium/AesTube.cpp", "beebium/AesDebug.cpp"]}
 for f in sorted(sources):
     print("sha1", hashlib.sha1(sources[f].encode()).hexdigest(), f)
 print("faults", len(faults.F), flush=True)
 for t in glob.glob("tests/test_*.cpp") + list(sources):
     subprocess.check_call(["clang++", *flags, "-c", t, "-o", t[:-4] + ".o"])
-# Beebium's Tube chip is apparatus, linked and never read: it takes no faults.
+# Beebium's Tube chip and its debugger interface (for AesDebug) are apparatus, linked and never
+# read, as acorn-aes-coprocessor/tests/run-tests.sh links them: they take no faults.
 subprocess.check_call(["clang++", *flags, "-c", str(beebium / "src/TubeUla.cpp"), "-o", "tests/tube_ula.o"])
+subprocess.check_call(["clang++", *flags, "-c", str(beebium / "extension-api/CpuDebugTarget.cpp"), "-o", "tests/cpu_debug_target.o"])
 test_objects = sorted(glob.glob("tests/*.o"))  # In name order: the run-last test needs it.
 
 

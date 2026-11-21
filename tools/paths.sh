@@ -12,19 +12,20 @@
 
 # AESulator: the Acorn ARM Evaluation System, a Beebium plugin.
 # paths.sh, reads aes-paths.sh and sets the defaults
-# version 1.0.0, 17 November 2026.
+# version 2.0.0, 20 November 2026.
 
 # Sourced by our scripts, which set AES_SOURCE to this folder's parent first. Where things are:
 # aes-paths.sh beside tools/ holds what cannot be worked out, and a variable already set wins.
 # The rest follows Beebium: its build folder is build/ (SRC, find_in_build_tree), and it runs
 # from BEEBIUM_SERVER and BEEBIUM_ROM_DIR, which we always name (SRC, its ci.yml).
 # The file may set a variable plainly (BEEBIUM_DIR="..."), so what was set before it is kept and put back.
+
 if [ -f "$AES_SOURCE/aes-paths.sh" ]; then
-    for aes_name in BEEBIUM_DIR BEEBIUM_BUILD AES_ROM AES_PROJECT AES_BUILD_JOBS; do
+    for aes_name in BEEBIUM_DIR BEEBIUM_BUILD AES_ROM AES_PROJECT AES_BUILD_JOBS CMAKE_PREFIX_PATH; do
         eval "aes_set_$aes_name=\"\${$aes_name-}\""
     done
     . "$AES_SOURCE/aes-paths.sh"
-    for aes_name in BEEBIUM_DIR BEEBIUM_BUILD AES_ROM AES_PROJECT AES_BUILD_JOBS; do
+    for aes_name in BEEBIUM_DIR BEEBIUM_BUILD AES_ROM AES_PROJECT AES_BUILD_JOBS CMAKE_PREFIX_PATH; do
         eval "[ -z \"\$aes_set_$aes_name\" ] || $aes_name=\"\$aes_set_$aes_name\""
     done
 fi

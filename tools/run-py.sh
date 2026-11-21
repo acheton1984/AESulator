@@ -13,10 +13,11 @@
 
 # AESulator: the Acorn ARM Evaluation System, a Beebium plugin.
 # run-py.sh, runs a Python tool in the tests' environment
-# version 1.0.0, 17 November 2026.
+# version 2.0.0, 20 November 2026.
 
 # Runs a Python tool in the tests' environment: tools/run-py.sh tools/run-frozen.py <folder>
+
 set -e
-here="$(cd "$(dirname "$0")/../aes-coprocessor/tests" && pwd)"
+here="$(cd "$(dirname "$0")/../acorn-aes-coprocessor/tests" && pwd)"
 . "$here/test-env.sh"
 exec uv run --frozen --project "$tree/tests" python "$@"

@@ -13,7 +13,7 @@
 
 # AESulator: the Acorn ARM Evaluation System, a Beebium plugin.
 # beebium-build.sh, configures and builds Beebium
-# version 1.0.0, 17 November 2026.
+# version 2.0.0, 20 November 2026.
 
 # Configures and builds Beebium. Paths: tools/paths.sh. Libraries kept in a folder of their own,
 # outside the system's, are named by CMAKE_PREFIX_PATH.
@@ -27,6 +27,7 @@
 # AES_BUILD_JOBS compiles that many files at a time, 4 if unset. Under Ninja, Beebium's
 # beebium_heavy_compile pool keeps its largest compiles to one at a time.
 # -L to that folder's lib makes our binaries use its libc++, the one its libraries use.
+
 set -e
 here="$(cd "$(dirname "$0")" && pwd)"
 AES_SOURCE="$(cd "$here/.." && pwd)"

@@ -12,7 +12,7 @@
 
 # AESulator: the Acorn ARM Evaluation System, a Beebium plugin.
 # aes-paths.template.sh, where things are: copy to aes-paths.sh and fill in
-# version 1.0.0, 17 November 2026.
+# version 2.0.0, 20 November 2026.
 
 # Copy this file to aes-paths.sh, in the same folder; the scripts read
 # aes-paths.sh themselves.
@@ -20,7 +20,7 @@
 # A variable already set in your terminal with export is used instead of the
 # line here.
 
-# Beebium's source folder, v0.15.0. Needed.
+# Beebium's source folder, v0.20.1. Needed.
 #BEEBIUM_DIR="/path/to/beebium"
 
 # The Executive ROM. Without it the tests tied to the ROM skip.
@@ -31,3 +31,7 @@
 
 # How many files the build compiles at a time; 4 if unset.
 #AES_BUILD_JOBS="4"
+
+# Where Beebium's libraries are, only if they are not where Homebrew puts them
+# (BUILDING.md, step 5).
+#CMAKE_PREFIX_PATH="/path/to/libraries"

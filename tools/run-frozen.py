@@ -13,24 +13,54 @@
 
 # AESulator: the Acorn ARM Evaluation System, a Beebium plugin.
 # run-frozen.py, runs every program on the frozen test discs
-# version 1.0.0, 17 November 2026.
+# version 2.0.0, 20 November 2026.
 
-"""Runs every program on the three frozen test discs, each on a fresh boot and its own copy, and
+"""Runs every program on the frozen test discs, each on a fresh boot and its own copy, and
 writes its spool log and a summary to a folder. The test: each program ends and
 its last line appears. tools/run_check.py then checks each log for its Tnn DONE line and no
-Executive message, and the run exits non-zero if one fails (OI-12). The logs are emulator output, never expected values. AESCHECK is left out:
+Executive message, and the run exits non-zero if one fails (the check all run scripts share). The logs are emulator output, never expected values. AESCHECK is left out:
 its RUN04Y hangs on purpose (notes/acceptance-suite.md).
-Use: tools/run-py.sh tools/run-frozen.py <output folder> [program ...]. With AES_LOG_FOLDER set,
-each run goes through the counting wrapper, with its log in that folder.
+Use: tools/run-py.sh tools/run-frozen.py <output folder> [--rom <SHA-1 start>] [program ...]. With
+AES_LOG_FOLDER set, each run goes through the counting wrapper, with its log in that folder, named
+by disc and program, as two programs' names are on two discs each.
+Another ROM: --rom names it by the start of its SHA-1 (8 hex digits or more), for example
+--rom df785d8a, the board's own ROM, the one for real-AES comparisons (results/provenance.txt).
+The ROM is looked for, by hash, in AES_ROM's folder and the folders below it, then in the
+project's scratch/; it is read in place, never copied into the repo. It needs a facts file in
+acorn-aes-coprocessor/tests/rom-facts/. The board's ROM is not a file of its own but $.ROMDUMP on
+the day's AESTESTS disc image, so copy it to scratch/ first:
+    disc get "<your AESTESTS.ssd>:$.ROMDUMP" scratch/roms/df785d8a.rom
+Without --rom the ROM is AES_ROM's, the 1.01 ROM, as before.
 """
 import collections
+import hashlib
 import os
 import sys
 import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parent / "aes-coprocessor" / "tests"))
+sys.path.insert(0, str(HERE.parent / "acorn-aes-coprocessor" / "tests"))
+
+
+def rom_by_hash(start):
+    """The first file of 16 KB under AES_ROM's folder, then scratch/, whose SHA-1 begins `start`."""
+    places = [Path(os.environ.get("AES_ROM", "")).parent, HERE.parent / "scratch"]
+    for place in places:
+        for path in sorted(place.rglob("*")) if place.is_dir() else []:
+            if path.is_file() and path.stat().st_size == 16384 and \
+                    hashlib.sha1(path.read_bytes()).hexdigest().startswith(start.lower()):
+                return path
+    sys.exit(f"No ROM with SHA-1 starting {start} under {' or '.join(map(str, places))}")
+
+
+if "--rom" in sys.argv:
+    at = sys.argv.index("--rom")
+    if at + 1 >= len(sys.argv) or len(sys.argv[at + 1]) < 8:
+        sys.exit("--rom needs at least 8 hex digits of the SHA-1")
+    os.environ["AES_ROM"] = str(rom_by_hash(sys.argv[at + 1]))
+    del sys.argv[at:at + 2]
+    print("ROM", os.environ["AES_ROM"], flush=True)
 
 import dfs_image  # noqa: E402
 from aes_host import Aes, calls_on_r2, copy_frozen, frozen_unchanged  # noqa: E402
@@ -41,6 +71,8 @@ DISCS = {
     "AESTIER2": ["RUN03", "RUN13", "RUN06", "RUN10", "RUN04P1", "RUN08", "RUN11"],
     "AESTIER3": ["RUN11Q6", "RUN05P1", "RUN05P2", "RUN04N", "RUN04Y"],
     "AESTIER4": ["RUN17", "RUN18", "RUN19"],
+    "AESTIER6": ["RUNALL"],
+    "AESTIER7": ["RUN23", "RUN25", "RUN19", "RUN05P1", "RUN26"],
 }
 EXEC_HANDLE = 0x0256  # INF, MOS 1.20's copy of the *EXEC handle, as OSBYTE &C6 reads it.
 LIMIT_SECONDS = 900
@@ -55,7 +87,7 @@ def run(disc_name, run_file, out_folder):
         if f"$.{run_file}" not in before:
             return f"{disc_name} {run_file}: no such file\n", [(f"{disc_name} {run_file}", ["no such file"])]
         log = os.environ.get("AES_LOG_FOLDER")
-        with Aes(disc=disc, tube_log=Path(log) / f"{run_file}.log" if log else None) as aes:
+        with Aes(disc=disc, tube_log=Path(log) / f"{disc_name}-{run_file}.log" if log else None) as aes:
             aes.boot()
             aes.wire.clear()
             aes.forget_text()

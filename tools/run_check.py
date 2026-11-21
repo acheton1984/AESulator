@@ -13,9 +13,9 @@
 
 # AESulator: the Acorn ARM Evaluation System, a Beebium plugin.
 # run_check.py, checks a run's text for its end line and Executive messages
-# version 1.0.0, 17 November 2026.
+# version 2.0.0, 20 November 2026.
 
-"""The one check the run scripts share (OI-12). A run that
+"""The one check the run scripts share. A run that
 stops with an Executive message falls back to the prompt, so the prompt is no proof: the text
 must hold the run's end line and no Executive message, unless that test may end in one.
 The messages are the ROM facts file's (SRC, ROM bytes), so no ROM's text is written here.
@@ -26,7 +26,7 @@ import re
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "aes-coprocessor" / "tests"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "acorn-aes-coprocessor" / "tests"))
 
 from aes_host import fact  # noqa: E402
 

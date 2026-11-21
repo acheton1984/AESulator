@@ -12,21 +12,28 @@
 
 # AESulator: the Acorn ARM Evaluation System, a Beebium plugin.
 # fault-list.py, the list of faults
-# version 1.0.0, 17 November 2026.
+# version 2.0.0, 20 November 2026.
 
 # The faults for tools/fault-check.py. Each is (name, exact text, text to put in its place),
-# in aes-coprocessor/ArmCore.cpp, or (file, name, exact text, new text) for another file. Only the
+# in acorn-aes-coprocessor/ArmCore.cpp, or (file, name, exact text, new text) for another file. Only the
 # first match is changed. If the code changes and a
 # text no longer matches, the run says NOT FOUND: update that entry, never drop it silently.
 # Faults 1-52 were the first written, in the old repository. Faults 53-66 are the ones from the first 24-fault
 # check (31 Oct 2026) that the 52 did not already include. Keep the numbers stable: add at the end.
 # Faults 67-86 are for AesMemory and AesTiming; 87-95 for abort strict; 96 on came later.
 # The old fault 85, a block break on ROM, was dropped with the code it changed (USER, 31 Oct 2026), so later numbers moved down by one.
+# The old fault 141, enc_b_rd WritesRd ignores R15, was dropped with the switch the real AES decided (step 5.6a, 17 Nov 2026), so
+# 142 to 149 became 141 to 148. With it went three faults left only in code those switches needed: the old 101,
+# Card from bank 1, and 102, No card place (the card place served only time.ram_bank), and 140, Passing undefined
+# skipped under the skip alternative (reachable only under cpu.undef_failed_cond Skipped). So 141 to 148 are now 138 to 145.
 # The old faults 73 and 74, on abort empty, were dropped with it (USER, 5 Nov 2026), so later numbers moved down by two.
 # Faults 140-144 are for the new tests from the ARM1-versus-ARM2 audit.
 # Faults 92, 94 and 95 were rewritten on 4 Nov 2026 for the new abort strict rule (USER: checking from the
 # first user-mode access, lax again at every reset); their old text was gone with the latch rule. 147-151 are new for it.
+# Faults 114 and 145 were rewritten in step 4.5 (19 Nov 2026): steps 4.4a and 4.4b had changed their text. Fault 118
+# was given its indent then, so it hits the run loop again, not step 4.4a's step (fault 151).
 # Fault 66 is expected to show MISSED: step() cannot restart while the reset line is held, so it changes nothing.
+
 F=[
 ("FIQ R10 not banked","{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16,","{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 16,"),
 ("IRQ R13 shares SVC slot","10, 11, 12, 20, 21}","10, 11, 12, 22, 21}"),
@@ -42,26 +49,26 @@ F=[
 ("IRQ entry also masks FIQ","enter(kVecIrq, kIrq, false,","enter(kVecIrq, kIrq, true,"),
 ("Data abort R14 +4 (step)","enter(kVecDataAbort, kSvc, false, pc_from_instruction(8));  // DOC, SW p.29: \"subtract 8\".","enter(kVecDataAbort, kSvc, false, pc_from_instruction(4));"),
 ("Prefetch abort R14 +8","enter(kVecPrefetchAbort, kSvc, false, pc_from_instruction(4));","enter(kVecPrefetchAbort, kSvc, false, pc_from_instruction(8));"),
-("RRX carry bit 0 only by default","? bit(v, 0) || bit(v, 31)","? bit(v, 0)"),
+("RRX carry bit 0 only by default","carry = bit(v, 0) || bit(v, 31);","carry = bit(v, 0);"),
 ("LSL immediate carry off by one","carry = n < 32 ? bit(v, 32 - n) : (n == 32 && bit(v, 0));","carry = n < 32 ? bit(v, by_reg ? 32 - n : 31 - n) : (n == 32 && bit(v, 0));"),
 ("LSR by register 32 carry lost","carry = n < 32 ? bit(v, n - 1) : (n == 32 && bit(v, 31));","carry = n < 32 ? bit(v, n - 1) : (!by_reg && bit(v, 31));"),
 ("LSL by register 32 carry lost","carry = n < 32 ? bit(v, 32 - n) : (n == 32 && bit(v, 0));","carry = n < 32 ? bit(v, 32 - n) : false;"),
 ("Shift register uses 9 bits","first_cycle_reg(rs)) & 0xFF;","first_cycle_reg(rs)) & 0x1FF;"),
-("Rs = 0 clears carry by default","if (opt_.reg_shift_zero_carry == ArmOptions::RegShiftZeroCarry::Cleared) carry = false;","carry = false;"),
-("ROR above 31 carry bit 31","                        carry = false;\n                        break;","                        carry = bit(v, 31);\n                        break;"),
+("Rs = 0 clears carry by default","test 5 Q2, s = 0\n            // (results/real-aes-compare.md).\n            return v;","test 5 Q2, s = 0\n            // (results/real-aes-compare.md).\n            carry = false;\n            return v;"),
+("ROR above 31 carry 0 at multiples of 32","                        carry = r == 0 && bit(v, 31);","                        carry = false;"),
 ("Immediate carry taken without rotate","if (rot != 0) shifter_c = bit(op2, 31);","shifter_c = bit(op2, 31);"),
-("R15 as Rn carries PSR","if (rn == 15) return pc_from_instruction(by_reg ? opt_.r15_reg_shift_read : 8);","if (rn == 15) return r15_from_instruction(by_reg ? opt_.r15_reg_shift_read : 8);"),
-("R15 as Rm loses PSR","v = r15_from_instruction(by_reg ? opt_.r15_reg_shift_read : 8);","v = pc_from_instruction(by_reg ? opt_.r15_reg_shift_read : 8);"),
+("R15 as Rn carries PSR","if (rn == 15) return pc_from_instruction(by_reg ? 12 : 8);","if (rn == 15) return r15_from_instruction(by_reg ? 12 : 8);"),
+("R15 as Rm loses PSR","v = r15_from_instruction(by_reg ? 12 : 8);","v = pc_from_instruction(by_reg ? 12 : 8);"),
 ("R15 as Rs carries PSR","(rs == 15 ? pc_from_instruction(8)","(rs == 15 ? r15_from_instruction(8)"),
 ("TEQP also jumps","            write_psr(result, false);\n            return;","            write_psr(result, false);\n            set_pc(result); refill_pipeline();\n            return;"),
 ("S clear still writes PSR","if (set) write_psr(result, true);","write_psr(result, true);"),
 ("LDR to R15 changes PSR","set_pc(value);  // DOC, SW p.21: never the PSR.","r15_ = value;"),
-("STR R15 ignores switch, +8","r15_from_instruction(opt_.r15_str_value)","r15_from_instruction(8)"),
-("STM R15 ignores switch, +8","r15_from_instruction(opt_.r15_stm_value)","r15_from_instruction(8)"),
+("STR R15 ignores switch, +8","r15_from_instruction(12) : reg(rd)","r15_from_instruction(8) : reg(rd)"),
+("STM R15 ignores switch, +8","value = r15_from_instruction(12);","value = r15_from_instruction(8);"),
 ("Wrapped STRB writes a word (old bug)","        } else {\n            write_bus();\n        }\n        take_abort();","        } else {\n            bus_.write_word(bus_address & ~3u, store_value, false);\n        }\n        take_abort();"),
 ("Post-index does not write back","!pre || wb_bit","wb_bit"),
-("Address check uses the base","(check_used ? address : base)","(check_used ? base : address)"),
-("LDR fault writes base back","if (writeback && opt_.adx_base_writeback && rn != 15) reg(rn) = moved;","if (writeback && rn != 15) reg(rn) = moved;"),
+("Address check uses the base","C6 (results/real-aes-compare.md).\n    if (address & kBadAddress) {","C6 (results/real-aes-compare.md).\n    if (base & kBadAddress) {"),
+("LDR fault writes base back","        // test 7 C4 to C6 (results/real-aes-compare.md).\n        enter(","        // test 7 C4 to C6 (results/real-aes-compare.md).\n        if (writeback && rn != 15) reg(rn) = moved;\n        enter("),
 ("STM base written after all transfers","            if (first && writeback) write_back(new_base);\n            first = false;\n        }\n        next_fetch_sequential_ = false;","            first = false;\n        }\n        if (writeback) write_back(new_base);\n        next_fetch_sequential_ = false;"),
 ("Block start address inverted","lowest + (pre == up ? 4 : 0)","lowest + (pre != up ? 4 : 0)"),
 ("STM ^ ignores user bank","value = user_bank ? regs_[kBank[kUser][i]] : reg(i);","value = reg(i);"),
@@ -85,7 +92,7 @@ F=[
 ("LSR and ASR by 0 mean 31","n = 32;  // DOC","n = 31;  // DOC"),
 ("STR ends with S fetch","next_fetch_sequential_ = load;","next_fetch_sequential_ = true;"),
 ("Block start ignores up","lowest + (pre == up ? 4 : 0)","lowest + (pre ? 4 : 0)"),
-("Register shift has no extra cycle","if (by_reg) bus_.internal(pc_from_instruction(12));  // DOC, SW p.14","if (false) bus_.internal(pc_from_instruction(12));  // DOC, SW p.14"),
+("Register shift has no extra cycle","            bus_.internal(pc_from_instruction(12));  // DOC, SW p.14: one extra cycle.","            (void)0;  // DOC, SW p.14: one extra cycle."),
 ("Exception R14 drops PSR","(r15_ & ~kPcMask) | (link_pc & kPcMask);","(link_pc & kPcMask);"),
 ("FIQ ignores the F mask","if (fiq_line_ && !(r15_ & kF))","if (fiq_line_)"),
 ("Immediate rotate never sets carry","if (rot != 0) shifter_c = bit(op2, 31);","if (false) shifter_c = bit(op2, 31);"),
@@ -99,7 +106,7 @@ F=[
 ('AesMemory.cpp','Reset leaves the latch','void AesMemory::power_on() {','void AesMemory::power_on() {\n    return;'),
 ('AesMemory.cpp','A22 decoded','const uint32_t offset = addr & (4 * kMb - 1);','const uint32_t offset = addr & (8 * kMb - 1);'),
 ('AesMemory.cpp','Bank test off by one bank','if (offset < fitted_bytes_) return {Kind::Ram, offset, true};','if (offset <= fitted_bytes_) return {Kind::Ram, offset, true};'),
-('AesMemory.cpp','ROM no repeat by default','offset & (kRomBytes - 1), true}','offset, offset < kRomBytes}'),
+('AesMemory.cpp','ROM no repeat by default','(addr & kRegion) & (kRomBytes - 1), true}','addr & kRegion, (addr & kRegion) < kRomBytes}'),
 ('AesMemory.cpp','Tube select wrong bits','return (addr >> 2) & 7; }','return (addr >> 1) & 7; }'),
 ('AesMemory.cpp','Upper Tube half selected','const bool lower = !(addr & kUpperHalf);','const bool lower = true;'),
 ('AesMemory.cpp','Region 10 abort on writes too','    const Target target = start_write(addr, seq);\n    if (target.kind == Kind::Tube) {\n        suspect();','    const Target target = start_write(addr, seq);\n    if (target.kind == Kind::Region10 && opt_.region10_read == AesOptions::Region10Read::Abort) abort_line = true;\n    if (target.kind == Kind::Tube) {\n        suspect();'),
@@ -110,7 +117,7 @@ F=[
 ('AesTiming.cpp','PAL clock 2 ticks','const int kPalClock = 3;','const int kPalClock = 2;'),
 ('AesTiming.cpp','Refresh any cycle','if (refresh_can_start && ticks_ >= next_refresh_)','if (ticks_ >= next_refresh_)'),
 ('AesTiming.cpp','Refresh period restarts','while (next_refresh_ <= ticks_) next_refresh_ += opt_.time_refresh_period;','next_refresh_ = ticks_ + opt_.time_refresh_period;'),
-('AesTiming.cpp','Block size 16 words','(addr & kBlockWordBits) == 0;','(addr & 0x3C) == 0;'),
+('AesTiming.cpp','Block size 16 words','(last_addr_ & kBlockWordBits) == kBlockWordBits;','(last_addr_ & 0x3C) == 0x3C;'),
 ('AesTiming.cpp','Internal blocks refresh','pass(kS, !is_ram(place) || !seq || block_end);','pass(kS, false);'),
 ('AesMemory.cpp','Strict: RAM repeats allowed','const bool in_ram = addr < fitted_bytes_;','const bool in_ram = addr < 0x1000000;'),
 ('AesMemory.cpp','Strict: one byte too many of RAM','const bool in_ram = addr < fitted_bytes_;','const bool in_ram = addr <= fitted_bytes_;'),
@@ -128,8 +135,6 @@ F=[
 ('AesTiming.cpp','Internal treated as RAM everywhere','pass(kS, !is_ram(place) || !seq || block_end);','pass(kS, !seq || block_end);'),
 ('AesMemory.cpp','No ROM wait under the latch','if (boot_latch_ && !(addr & kA24)) return Place::Rom;',''),
 ('AesMemory.cpp','Latch wait region 00 only','if (boot_latch_ && !(addr & kA24)) return Place::Rom;','if (boot_latch_ && (addr & kAddress) >> 24 == 0) return Place::Rom;'),
-('AesMemory.cpp','Card from bank 1','target.offset >= 2 * kMb ? Place::RamCard','target.offset >= kMb ? Place::RamCard'),
-('AesMemory.cpp','No card place','target.offset >= 2 * kMb ? Place::RamCard : Place::Ram','Place::Ram'),
 ('AesMemory.cpp','Region 10 timed as RAM','    return Place::Nothing;\n','    return Place::Ram;\n'),
 ('AesMemory.cpp','Tube timed as ROM','return Place::Tube;','return Place::Rom;'),
 ('AesMemory.cpp','ROM timed as nothing','if (target.kind == Kind::Rom) return Place::Rom;\n',''),
@@ -143,14 +148,14 @@ F=[
 ('AesMemory.cpp','Last bus misses writes','    last_bus_ = value;\n}\n','}\n'),
 ('AesMemory.cpp','Last bus byte on one lane','last_bus_ = value * 0x01010101u;','last_bus_ = value;'),
 ('AesMemory.cpp','Last bus misses Tube and byte reads','    last_bus_ = word;\n',''),
-('beebium/AesTube.cpp','Pause does not stop the ARM','    if (paused_) return;\n',''),
+('beebium/AesTube.cpp','Pause does not stop the ARM','    if (paused_) {\n        held_by_prst();\n        return;\n    }\n',''),
 ('beebium/AesTube.cpp','P never holds','return active && opt_.tube_prst_level == AesOptions::TubePrstLevel::Holds;','return false;'),
 ('beebium/AesTube.cpp','Restart leaves the latch clear','    memory_.reset();\n    core_.set_reset(false);','    core_.set_reset(false);'),
 ('beebium/AesTube.cpp','Reset keeps the time base','    clock_.rebase();\n',''),
-('beebium/AesTube.cpp','IRQ wired to PNMI','core_.set_irq(ula_.pirq());','core_.set_irq(ula_.pnmi_level());'),
+('beebium/AesTube.cpp','IRQ wired to PNMI','        core_.set_irq(ula_.pirq());','        core_.set_irq(ula_.pnmi_level());'),
 ('beebium/AesTube.cpp','FIQ not wired','        core_.set_fiq(ula_.pnmi_level());\n',''),
-('beebium/AesTube.cpp','Tube instructions never wait','if (!interrupt_will_be_taken() && must_wait_for_tube()) break;',''),
-('beebium/AesTube.cpp','Interrupts wait as well','if (!interrupt_will_be_taken() && must_wait_for_tube()) break;','if (must_wait_for_tube()) break;'),
+('beebium/AesTube.cpp','Tube instructions never wait','if (!core_.interrupt_will_be_taken() && must_wait_for_tube()) break;',''),
+('beebium/AesTube.cpp','Interrupts wait as well','if (!core_.interrupt_will_be_taken() && must_wait_for_tube()) break;','if (must_wait_for_tube()) break;'),
 ('beebium/AesTube.cpp','Register offset forgotten','    if (single && (top & 2)) return true;  // A register offset could reach anywhere.\n',''),
 ('beebium/AesTube.cpp','Nine ticks a host cycle','kTicksPerHostCycle{uint32_t(kHostCycle), 1}','kTicksPerHostCycle{uint32_t(kHostCycle - 1), 1}'),
 ('beebium/AesTube.cpp','Block priced as one word','fetch + words * word + kS','fetch + word + kS'),
@@ -168,10 +173,8 @@ F=[
 # Faults 140-144: the ARM1-versus-ARM2 audit (3 Nov 2026).
 ("FIQ banks R8 and R9, as the ARM2","{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 17, 18, 19}","{0, 1, 2, 3, 4, 5, 6, 7, 20, 21, 15, 16, 17, 18, 19}"),
 ("MRC and MCR taken as SWI","const bool is_undefined = top >= 0xC && top != 0xF;","const bool is_undefined = top >= 0xC && top != 0xF && !(top == 0xE && bit(ir, 4));"),
-("Passing undefined skipped under the skip alternative","            if (is_undefined) {\n                undefined();","            if (is_undefined) {\n                return;"),
-("enc_b_rd WritesRd ignores R15","            } else {\n                set_pc(result);\n                refill_pipeline();\n            }\n        }\n","            }\n        }\n"),
 ("MUL encoding multiplies, as the ARM2","        if (by_reg && bit(ir, 7) && opt_.enc_a_bit7","        if (by_reg && bit(ir, 7) && ((ir >> 5) & 3) == 0 && (ir & 0x0FC00000) == 0) { reg(rn) = reg(ir & 15) * reg((ir >> 8) & 15); return; }\n        if (by_reg && bit(ir, 7) && opt_.enc_a_bit7"),
-# Faults 145-146: OI-14. They are caught by the server tests test_bget_reply_bytes and
+# Faults 145-146: the OSBGET and OSBPUT reply bytes. They are caught by the server tests test_bget_reply_bytes and
 # test_bput_reply_is_7f; tools/fault-check.py runs only the headless tests, so it may show them MISSED.
 ('AesMemory.cpp','R2 data reads lose bit 7','(undriven() & ~0xFFu) | tube_.read(tube_register(addr));','(undriven() & ~0xFFu) | (tube_.read(tube_register(addr)) & (tube_register(addr) == 3 ? 0x7F : 0xFF));'),
 ('AesMemory.cpp','R2 data byte writes of &80 up lose bit 0','if (target.fitted) tube_.write(tube_register(addr), value);','if (target.fitted) tube_.write(tube_register(addr), tube_register(addr) == 3 && value >= 0x80 ? uint8_t(value & 0xFE) : value);'),
@@ -180,5 +183,13 @@ F=[
 ('AesMemory.cpp','Strict never starts','strict_on_ = true;','strict_on_ = false;'),
 ('Exception entry leaves user_mode set','void ArmCore::use_banks_of_current_mode() {\n    bus_.user_mode = (r15_ & 3) == kUser;','void ArmCore::use_banks_of_current_mode() {'),
 ('TEQP into user mode seen an instruction late','    r15_ = (r15_ & ~mask) | (value & mask);\n    bus_.user_mode = (r15_ & 3) == kUser;','    r15_ = (r15_ & ~mask) | (value & mask);'),
-('LDRT sets user_mode','return is_byte ? bus_.read_byte(bus_address, false) : bus_.read_word(bus_address, false);','bus_.user_mode = bus_.user_mode || (!pre && wb_bit); return is_byte ? bus_.read_byte(bus_address, false) : bus_.read_word(bus_address, false);'),
+('LDRT sets user_mode','const uint32_t value = is_byte ? bus_.read_byte(bus_address, false)','bus_.user_mode = bus_.user_mode || (!pre && wb_bit); const uint32_t value = is_byte ? bus_.read_byte(bus_address, false)'),
+# Faults 146-151: the debugger (step 4.5, 19 Nov 2026; the four kinds the owner chose, plus 151 from fault 118):
+# a step's ticks and sequence, P ending in a pause, a breakpoint off by one, a watchpoint cut to 16 bits.
+('beebium/AesTube.cpp','Step returns one tick too many','return timing_.ticks() - before;','return timing_.ticks() - before + 1;'),
+('beebium/AesTube.cpp','Step not counted in the sequence','    core_.step();\n    instructions_++;\n    return timing_.ticks() - before;','    core_.step();\n    return timing_.ticks() - before;'),
+('beebium/AesTube.cpp','P ending in a pause does not restart','    if (paused_) {\n        held_by_prst();\n        return;\n    }\n','    if (paused_) return;\n'),
+('beebium/AesTube.cpp','Breakpoint asked one instruction early','stops_->before_instruction(((core_.r15() & ArmCore::kPcMask) - 8)','stops_->before_instruction(((core_.r15() & ArmCore::kPcMask) - 4)'),
+('beebium/AesDebug.cpp','Watchpoint address cut to 16 bits','const uint32_t at = addr + uint32_t(i);','const uint32_t at = (addr + uint32_t(i)) & 0xFFFF;'),
+('beebium/AesTube.cpp','Step: IRQ wired to PNMI','    core_.set_irq(ula_.pirq());\n    core_.set_fiq(ula_.pnmi_level());\n    core_.step();','    core_.set_irq(ula_.pnmi_level());\n    core_.set_fiq(ula_.pnmi_level());\n    core_.step();'),
 ]
